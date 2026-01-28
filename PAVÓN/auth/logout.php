@@ -5,7 +5,7 @@ session_start();
 // Destruir todas las variables de sesión
 $_SESSION = array();
 
-// Borrar la cookie de sesión si existe
+// Borrar la cookie de sesión si existe (limpieza profunda)
 if (ini_get("session.use_cookies")) {
     $params = session_get_cookie_params();
     setcookie(session_name(), '', time() - 42000,
@@ -17,7 +17,7 @@ if (ini_get("session.use_cookies")) {
 // Destruir la sesión completamente
 session_destroy();
 
-// Redirigir al login
-header("Location: login.php");
+// CAMBIO: Redirigir al inicio (index.php) en lugar del login
+header("Location: ../index.php");
 exit;
 ?>
