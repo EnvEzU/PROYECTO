@@ -4,8 +4,8 @@ session_start();
 require_once '../config/conexion.php';
 
 // Validar ID
-if (!isset($_GET['id_historial'])) { die("Error: Falta ID."); }
-$id_historial = intval($_GET['id_historial']);
+if (!isset($_POST['id_historial'])) { die("Error: Falta ID."); }
+$id_historial = intval($_POST['id_historial']);
 
 // 1. Obtener dominio (Sin filtrar por usuario para permitir invitados)
 $sql = "SELECT dominio FROM historial_dominios WHERE id = ?";

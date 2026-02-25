@@ -50,7 +50,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <div class="container" style="max-width: 400px;">
         <div class="card shadow">
             <div class="card-body">
-                <h3 class="text-center mb-4">Login (MD5)</h3>
+                <h3 class="text-center mb-4">Inicia sesión</h3>
                 <?= $mensaje ?>
                 <form method="POST">
                     <div class="mb-3">
