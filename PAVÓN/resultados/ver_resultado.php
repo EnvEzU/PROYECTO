@@ -44,17 +44,16 @@ require_once '../includes/header.php';
     </div>
 
     <div class="alert <?= ($info['estado'] == 'maliciosa' ? 'alert-danger' : 'alert-success') ?> text-center shadow-sm">
-        <h3 class="mb-0">ESTADO: <?= strtoupper($info['estado']) ?></h3>
+        <h3 class="mb-0">ESTADO FINAL: <?= strtoupper($info['estado']) ?></h3>
     </div>
 
-    <div class="row">
+    <div class="row mb-4">
         <div class="col-md-5 mb-3">
             <div class="card h-100 shadow-sm border-primary">
-                <div class="card-header bg-primary text-white fw-bold">Análisis VirusTotal (API v3)</div>
+                <div class="card-header bg-primary text-white fw-bold"><i class="bi bi-shield-check"></i> Análisis VirusTotal</div>
                 <div class="card-body">
                     <?php 
                     $vt = json_decode($data['VirusTotal'] ?? '{}', true);
-                    
                     if (is_array($vt) && isset($vt['data']['attributes']['last_analysis_stats'])) {
                         $s = $vt['data']['attributes']['last_analysis_stats'];
                         echo "<ul class='list-group list-group-flush'>";
@@ -63,7 +62,7 @@ require_once '../includes/header.php';
                         echo "<li class='list-group-item d-flex justify-content-between'>Sospechosos <span class='badge bg-warning text-dark rounded-pill'>{$s['suspicious']}</span></li>";
                         echo "</ul>";
                     } else { 
-                        echo "<div class='text-muted p-3'>No se pudieron procesar datos estructurados de la API.</div>"; 
+                        echo "<div class='text-muted p-3'>No hay datos de VirusTotal.</div>"; 
                     }
                     ?>
                 </div>
@@ -71,44 +70,59 @@ require_once '../includes/header.php';
         </div>
 
         <div class="col-md-7 mb-3">
+            <div class="card h-100 shadow-sm border-success">
+                <div class="card-header bg-success text-white fw-bold"><i class="bi bi-geo-alt"></i> Ubicación del Servidor (GeoIP)</div>
+                <div class="card-body p-0">
+                    <pre class="p-3 bg-light m-0" style="max-height: 250px; overflow-y: auto; font-size: 0.85rem;"><?= htmlspecialchars($data['GeoIP'] ?? 'Sin datos de ubicación.') ?></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-6 mb-3">
             <div class="card h-100 shadow-sm border-dark">
-                <div class="card-header bg-dark text-white fw-bold">Información Registrador (WHOIS)</div>
+                <div class="card-header bg-dark text-white fw-bold"><i class="bi bi-person-badge"></i> Registro WHOIS</div>
                 <div class="card-body p-0">
-                    <pre class="p-3 bg-light m-0" style="max-height: 400px; overflow-y: auto; font-size: 0.8rem;"><?= htmlspecialchars($data['Whois'] ?? 'Sin datos.') ?></pre>
+                    <pre class="p-3 bg-light m-0" style="max-height: 350px; overflow-y: auto; font-size: 0.8rem;"><?= htmlspecialchars($data['Whois'] ?? 'Sin datos.') ?></pre>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6 mb-3">
+            <div class="card h-100 shadow-sm border-danger">
+                <div class="card-header bg-danger text-white fw-bold"><i class="bi bi-door-open"></i> Escáner de Puertos TCP</div>
+                <div class="card-body p-0">
+                    <pre class="p-3 bg-light m-0" style="max-height: 350px; overflow-y: auto; font-size: 0.85rem;"><?= htmlspecialchars($data['Puertos'] ?? 'No se realizó escaneo de puertos.') ?></pre>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="row mb-3">
-        <div class="col-12">
+    <div class="row mb-4">
+        <div class="col-12 mb-3">
             <div class="card shadow-sm border-info">
-                <div class="card-header bg-info text-dark fw-bold">
-                    <i class="bi bi-server"></i> Topología de Registros DNS (DIG)
-                </div>
+                <div class="card-header bg-info text-dark fw-bold"><i class="bi bi-server"></i> Registros DNS (DIG)</div>
                 <div class="card-body p-0">
-                    <?php if (isset($data['Dig'])): ?>
-                        <pre class="p-3 bg-light m-0" style="max-height: 400px; overflow-y: auto; font-size: 0.85rem; color: #333;"><?= htmlspecialchars($data['Dig']) ?></pre>
-                    <?php else: ?>
-                        <p class="p-3 text-muted m-0">No hay datos de DNS.</p>
-                    <?php endif; ?>
+                    <pre class="p-3 bg-light m-0" style="max-height: 300px; overflow-y: auto; font-size: 0.85rem;"><?= htmlspecialchars($data['Dig'] ?? 'No hay datos DNS.') ?></pre>
                 </div>
             </div>
         </div>
-    </div>
 
-    <div class="row mb-3">
-        <div class="col-12">
-            <div class="card shadow-sm border-warning">
-                <div class="card-header bg-warning text-dark fw-bold">
-                    <i class="bi bi-diagram-3"></i> Variaciones de Dominio (Typosquatting - dnstwist)
-                </div>
+        <div class="col-12 mb-3">
+            <div class="card shadow-sm border-secondary">
+                <div class="card-header bg-secondary text-white fw-bold"><i class="bi bi-diagram-2"></i> Subdominios Detectados (CRT.SH)</div>
                 <div class="card-body p-0">
-                    <?php if (isset($data['Dnstwist'])): ?>
-                        <pre class="p-3 bg-light m-0" style="max-height: 300px; overflow-y: auto; font-size: 0.8rem;"><?= htmlspecialchars($data['Dnstwist']) ?></pre>
-                    <?php else: ?>
-                        <p class="p-3 text-muted m-0">No hay datos de DNSTwist.</p>
-                    <?php endif; ?>
+                    <pre class="p-3 bg-light m-0" style="max-height: 300px; overflow-y: auto; font-size: 0.85rem;"><?= htmlspecialchars($data['Subdominios'] ?? 'No se detectaron subdominios.') ?></pre>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 mb-3">
+            <div class="card shadow-sm border-warning">
+                <div class="card-header bg-warning text-dark fw-bold"><i class="bi bi-diagram-3"></i> Posibles Variaciones (Typosquatting)</div>
+                <div class="card-body p-0">
+                    <pre class="p-3 bg-light m-0" style="max-height: 300px; overflow-y: auto; font-size: 0.8rem;"><?= htmlspecialchars($data['Dnstwist'] ?? 'No hay datos de variaciones.') ?></pre>
                 </div>
             </div>
         </div>
@@ -117,11 +131,11 @@ require_once '../includes/header.php';
     <div class="text-center mt-4 mb-5">
         <?php if(isset($_SESSION['id_usuario'])): ?>
             <button onclick="window.print()" class="btn btn-success shadow">
-                <i class="bi bi-printer"></i> Imprimir Reporte
+                <i class="bi bi-printer"></i> Imprimir Reporte Completo
             </button>
         <?php else: ?>
             <div class="alert alert-warning d-inline-block">
-                Modo invitado: <a href="../auth/login.php" class="alert-link">Inicia sesión</a> para descargar.
+                Modo invitado: <a href="../auth/login.php" class="alert-link">Inicia sesión</a> para descargar el reporte en PDF.
             </div>
         <?php endif; ?>
     </div>

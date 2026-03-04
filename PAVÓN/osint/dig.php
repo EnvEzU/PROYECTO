@@ -97,7 +97,8 @@ $stmt = mysqli_prepare($conn, "INSERT INTO osint_resultados (id_historial, herra
 mysqli_stmt_bind_param($stmt, "is", $id, $out);
 mysqli_stmt_execute($stmt);
 
-// REDIRECCIÓN FINAL AL REPORTE
-echo "<script>window.location.href = '../resultados/ver_resultado.php?id=$id';</script>";
+// REDIRECCIÓN FINAL A geoip
+
+echo "<script>window.location.href = 'geoip.php?id_historial=$id';</script>";
 exit;
 ?>
