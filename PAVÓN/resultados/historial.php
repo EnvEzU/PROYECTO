@@ -11,7 +11,7 @@ if (!isset($_SESSION['id_usuario'])) {
 
 $id_usuario = $_SESSION['id_usuario'];
 
-// Consulta: Obtener análisis de ESTE usuario ordenados por fecha
+// Consulta: Obtener análisis de un usuario ordenados por fecha
 $sql = "SELECT * FROM historial_dominios WHERE id_usuario = ? ORDER BY fecha_escaneo DESC";
 $stmt = mysqli_prepare($conn, $sql);
 mysqli_stmt_bind_param($stmt, "i", $id_usuario);

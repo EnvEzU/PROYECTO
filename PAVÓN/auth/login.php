@@ -8,7 +8,7 @@ $mensaje = "";
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $email = trim($_POST['email']);
     $pass  = $_POST['pass']; 
-    $pass_md5 = md5($pass); // Usando MD5 como pediste
+    $pass_md5 = md5($pass);
 
     $sql = "SELECT id, usuario, rol FROM usuarios WHERE email = ? AND password = ?";
     
@@ -50,7 +50,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <div class="container" style="max-width: 400px;">
         <div class="card shadow">
             <div class="card-body">
-                <h3 class="text-center mb-4">Inicia sesión</h3>
+                <h3 class="text-center mb-4">Iniciar sesión</h3>
                 <?= $mensaje ?>
                 <form method="POST">
                     <div class="mb-3">

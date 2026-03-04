@@ -1,5 +1,4 @@
 <?php
-// Archivo: index.php
 session_start();
 $ruta_base = "./";
 require_once 'includes/header.php';
