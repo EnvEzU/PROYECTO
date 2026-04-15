@@ -5,100 +5,108 @@ require_once '../config/conexion.php';
 
 set_time_limit(60);
 
-if (!isset($_GET['id_historial'])) { die("Error ID."); }
-$id = intval($_GET['id_historial']);
+// 1. Validar ID por POST
+if (!isset($_POST['id_historial'])) { 
+    die("Error: No se recibió el ID."); 
+}
+$id = intval($_POST['id_historial']);
 
-$q = mysqli_query($conn, "SELECT dominio FROM historial_dominios WHERE id=$id");
-$d = mysqli_fetch_assoc($q);
+// 2. Obtener dominio con consulta preparada
+$stmt_check = mysqli_prepare($conn, "SELECT dominio FROM historial_dominios WHERE id = ?");
+mysqli_stmt_bind_param($stmt_check, "i", $id);
+mysqli_stmt_execute($stmt_check);
+$res_check = mysqli_stmt_get_result($stmt_check);
+$d = mysqli_fetch_assoc($res_check);
 
-if (!$d) { die("Dominio no encontrado en la BD."); }
+if (!$d) { die("Dominio no encontrado."); }
 $dom_puro = htmlspecialchars($d['dominio']);
 
 $ruta_base = "../";
 require_once '../includes/header.php';
 ?>
 
-<div class="container text-center mt-5 mb-5">
-    <div class="card shadow-lg border-0 mx-auto border-info border-top border-5" style="max-width: 600px;">
+<div class="container mt-5">
+    <div class="card shadow-lg border-0 mx-auto border-info border-top border-5">
         <div class="card-body p-5">
-            <h4 class="text-muted mb-3">Paso 4 de 4</h4>
-            <h2 class="text-info mb-4"><i class="bi bi-server"></i> Consultando Registros DNS (DIG)</h2>
-            <p class="lead">Extrayendo topología de red completa para <span class="fw-bold"><?= $dom_puro ?></span></p>
+            <h4 class="text-muted mb-3">Paso 4 de 6</h4>
+            <h2 class="text-info mb-4"><i class="bi bi-server"></i> DNS Resolver (DiG Mode)</h2>
+            <p class="lead">Consultando topología de red para: <span class="fw-bold"><?= $dom_puro ?></span></p>
             
-            <div class="alert alert-secondary mt-3 mb-4 text-start" style="font-size: 0.9rem;">
-                <i class="bi bi-info-circle"></i> Extrayendo registros A, AAAA, MX, TXT, NS y SOA.<br>
-            </div>
+            <div id="terminal" style="background: #001b2e; color: #0dcaf0; padding: 20px; font-family: 'Consolas', monospace; border-radius: 8px; height: 380px; overflow-y: auto; box-shadow: inset 0 0 15px #000; font-size: 0.85rem; border: 1px solid #084298; scroll-behavior: smooth;">
+                <?php
+                // Preparamos el volcado de buffer inmediato
+                if (ob_get_level() > 0) { ob_end_flush(); }
+                ob_implicit_flush(true);
 
-            <div class="mt-4 mb-4">
-                <div class="spinner-border text-info" style="width: 3rem; height: 3rem;" role="status">
-                    <span class="visually-hidden">Cargando...</span>
-                </div>
-            </div>
-            <div class="progress" style="height: 25px;">
-                <div class="progress-bar progress-bar-striped progress-bar-animated bg-info text-dark w-100 fw-bold" role="progressbar">
-                    Generando reporte final y guardando...
-                </div>
+                $dominio = $d['dominio'];
+                $out_header = "; <<>> OSINT PHP DiG Emulator <<>> $dominio ANY\n;; ANSWER SECTION:\n\n";
+                echo nl2br(htmlspecialchars($out_header));
+                flush();
+
+                // UNA SOLA CONSULTA para todos los registros (Mucho más rápido)
+                $registros = dns_get_record($dominio, DNS_ALL);
+                $full_output = $out_header;
+                $contador = 0;
+
+                if ($registros) {
+                    // Ordenamos por tipo para que el reporte quede limpio
+                    usort($registros, function($a, $b) { return strcmp($a['type'], $b['type']); });
+
+                    foreach ($registros as $r) {
+                        $host = $r['host'] . ".";
+                        $ttl = $r['ttl'] ?? 3600;
+                        $type = $r['type'];
+                        
+                        // Lógica de extracción de datos según el tipo
+                        $data = $r['ip'] ?? $r['target'] ?? $r['txt'] ?? $r['ipv6'] ?? '';
+                        if ($type == 'MX') $data = $r['pri'] . ' ' . $r['target'] . ".";
+                        if ($type == 'SOA') $data = $r['mname'] . ". " . $r['rname'] . ". " . $r['serial'];
+
+                        $linea = str_pad($host, 25) . "\t" . $ttl . "\tIN\t" . str_pad($type, 5) . "\t" . $data . "\n";
+                        
+                        // Efecto visual: imprimimos y esperamos apenas 5ms
+                        echo htmlspecialchars($linea) . "<br>";
+                        $full_output .= $linea;
+                        $contador++;
+
+                        // Scroll cada 2 registros para no saturar el navegador
+                        if ($contador % 2 == 0) {
+                            echo "<script>document.getElementById('terminal').scrollTop = document.getElementById('terminal').scrollHeight;</script>";
+                        }
+
+                        usleep(5000); // 5 milisegundos (Casi instantáneo pero visible)
+                        flush();
+                    }
+                } else {
+                    $msg_error = ";; No se encontraron registros públicos.\n";
+                    echo $msg_error;
+                    $full_output .= $msg_error;
+                }
+
+                $footer = "\n;; Query time: " . rand(5, 30) . " msec\n;; WHEN: " . date("D M d H:i:s T Y") . "\n";
+                echo nl2br(htmlspecialchars($footer));
+                $full_output .= $footer;
+
+                // 3. GUARDAR RESULTADO
+                $stmt = mysqli_prepare($conn, "INSERT INTO osint_resultados (id_historial, herramienta, resultado_completo) VALUES (?, 'Dig', ?)");
+                mysqli_stmt_bind_param($stmt, "is", $id, $full_output);
+                mysqli_stmt_execute($stmt);
+                ?>
+                <br><span style="color: #00ff00;">[OK] Se han resuelto <?= $contador ?> registros con éxito.</span>
             </div>
         </div>
     </div>
 </div>
 
+<form id="autoPost" action="geoip.php" method="POST">
+    <input type="hidden" name="id_historial" value="<?= $id ?>">
+</form>
+
+<script>
+    // Pausa de cortesía de 1 segundo para leer el final antes de saltar
+    setTimeout(function() {
+        document.getElementById('autoPost').submit();
+    }, 1000);
+</script>
+
 <?php require_once '../includes/footer.php'; ?>
-
-<?php
-// ENVIAR PANTALLA AL NAVEGADOR
-while (ob_get_level() > 0) { ob_end_flush(); }
-flush();
-
-// ==========================================
-// MOTOR DNS (ESTILO DIG WEB INTERFACE)
-// ==========================================
-$dominio_objetivo = $d['dominio'];
-$registros = dns_get_record($dominio_objetivo, DNS_ALL);
-
-$out = "; <<>> OSINT PHP DiG <<>> " . $dominio_objetivo . " ANY\n";
-$out .= ";; global options: +cmd\n";
-$out .= ";; Got answer:\n";
-$out .= ";; ->>HEADER<<- opcode: QUERY, status: NOERROR\n\n";
-$out .= ";; QUESTION SECTION:\n";
-$out .= ";" . str_pad($dominio_objetivo . ".", 24) . "\tIN\tANY\n\n";
-$out .= ";; ANSWER SECTION:\n";
-
-if ($registros) {
-    usort($registros, function($a, $b) { return strcmp($a['type'], $b['type']); });
-    foreach ($registros as $r) {
-        $host = $r['host'] . ".";
-        $ttl = $r['ttl'] ?? 3600;
-        $class = $r['class'] ?? 'IN';
-        $type = $r['type'];
-        $data = '';
-
-        if ($type == 'A') $data = $r['ip'];
-        elseif ($type == 'AAAA') $data = $r['ipv6'];
-        elseif ($type == 'MX') $data = $r['pri'] . ' ' . $r['target'] . ".";
-        elseif ($type == 'TXT') $data = '"' . $r['txt'] . '"';
-        elseif ($type == 'NS') $data = $r['target'] . ".";
-        elseif ($type == 'CNAME') $data = $r['target'] . ".";
-        elseif ($type == 'SOA') $data = $r['mname'] . ". " . $r['rname'] . ". " . $r['serial'];
-
-        if ($data != '') {
-            $out .= str_pad($host, 25) . "\t" . $ttl . "\t" . $class . "\t" . str_pad($type, 5) . "\t" . $data . "\n";
-        }
-    }
-} else {
-    $out .= ";; No se encontraron registros DNS.\n";
-}
-
-$out .= "\n;; Query time: " . rand(10, 80) . " msec\n";
-$out .= ";; SERVER: Servidor Local OSINT\n";
-$out .= ";; WHEN: " . date("D M d H:i:s T Y") . "\n";
-
-$stmt = mysqli_prepare($conn, "INSERT INTO osint_resultados (id_historial, herramienta, resultado_completo) VALUES (?, 'Dig', ?)");
-mysqli_stmt_bind_param($stmt, "is", $id, $out);
-mysqli_stmt_execute($stmt);
-
-// REDIRECCIÓN FINAL A geoip
-
-echo "<script>window.location.href = 'geoip.php?id_historial=$id';</script>";
-exit;
-?>

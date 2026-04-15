@@ -6,6 +6,7 @@ require_once '../config/conexion.php';
 // NOTA: Hemos quitado el bloqueo de seguridad para permitir acceso público.
 
 $error = "";
+$id_analisis = null;
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $dominio = trim($_POST['dominio']);
@@ -29,9 +30,24 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         
         if (mysqli_stmt_execute($stmt)) {
             $id_analisis = mysqli_insert_id($conn);
-            // Pasamos el ID a la siguiente fase
-            header("Location: virus_total.php?id_historial=" . $id_analisis);
+            
+            // REEMPLAZO DEL HEADER POR AUTO-POST
+            // Imprimimos el formulario y el script de envío inmediato
+            ?>
+            <!DOCTYPE html>
+            <html lang="es">
+            <body>
+                <form id="startPost" action="virus_total.php" method="POST">
+                    <input type="hidden" name="id_historial" value="<?= $id_analisis ?>">
+                </form>
+                <script>
+                    document.getElementById('startPost').submit();
+                </script>
+            </body>
+            </html>
+            <?php
             exit;
+            
         } else {
             $error = "Error al guardar: " . mysqli_error($conn);
         }
