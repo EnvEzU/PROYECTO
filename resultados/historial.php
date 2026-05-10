@@ -1,6 +1,10 @@
 <?php
 session_start();
 require_once '../config/conexion.php';
+require_once '../includes/seguridad.php';
+
+asegurarColumnaAnalisisCompleto($conn);
+limpiarAnalisisIncompletosAntiguos($conn, 60);
 
 if (!isset($_SESSION['id_usuario'])) {
     header("Location: ../auth/login.php");
@@ -9,9 +13,10 @@ if (!isset($_SESSION['id_usuario'])) {
 
 $id_usuario = (int)$_SESSION['id_usuario'];
 
-$sql = "SELECT id, dominio, estado, fecha_escaneo, detalles 
+$sql = "SELECT id, token_publico, dominio, estado, fecha_escaneo, detalles 
         FROM historial_dominios 
-        WHERE id_usuario = ? 
+        WHERE id_usuario = ?
+          AND analisis_completo = 1
         ORDER BY fecha_escaneo DESC, id DESC";
 
 $stmt = mysqli_prepare($conn, $sql);
@@ -66,7 +71,6 @@ require_once '../includes/header.php';
                 <table class="table table-hover table-striped mb-0 align-middle">
                     <thead class="table-light">
                         <tr>
-                            <th>ID</th>
                             <th>Dominio</th>
                             <th>Estado</th>
                             <th>Fecha</th>
@@ -87,10 +91,12 @@ require_once '../includes/header.php';
                                 } elseif ($fila['estado'] === 'segura') {
                                     $badgeClass = 'bg-success';
                                     $estadoTexto = 'Segura';
+                                } elseif ($fila['estado'] === 'no_concluyente') {
+                                    $badgeClass = 'bg-secondary';
+                                    $estadoTexto = 'No concluyente';
                                 }
                                 ?>
                                 <tr>
-                                    <td><?= (int)$fila['id'] ?></td>
                                     <td class="fw-bold"><?= htmlspecialchars($fila['dominio']) ?></td>
                                     <td>
                                         <span class="badge <?= $badgeClass ?>">
@@ -104,7 +110,7 @@ require_once '../includes/header.php';
                                         <?= htmlspecialchars(mb_strimwidth((string)($fila['detalles'] ?? ''), 0, 60, '...')) ?>
                                     </td>
                                     <td class="text-end">
-                                        <a href="ver_resultado.php?id=<?= (int)$fila['id'] ?>" class="btn btn-sm btn-outline-primary">
+                                        <a href="<?= htmlspecialchars(urlInformeAnalisis($conn, (int)$fila['id']), ENT_QUOTES, 'UTF-8') ?>" class="btn btn-sm btn-outline-primary">
                                             <i class="bi bi-eye"></i> Ver informe
                                         </a>
                                     </td>
@@ -112,7 +118,7 @@ require_once '../includes/header.php';
                             <?php endforeach; ?>
                         <?php else: ?>
                             <tr>
-                                <td colspan="6" class="text-center py-5 text-muted">
+                                <td colspan="5" class="text-center py-5 text-muted">
                                     <div class="mb-2">
                                         <i class="bi bi-search fs-2"></i>
                                     </div>

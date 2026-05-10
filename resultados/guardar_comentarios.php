@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once '../config/conexion.php';
+require_once '../includes/seguridad.php';
 
 // Verificar que el usuario esté logueado
 if (!isset($_SESSION['id_usuario'])) {
@@ -14,16 +15,49 @@ if ($_SERVER["REQUEST_METHOD"] !== "POST") {
     exit;
 }
 
+$token_reporte = strtolower(trim((string)($_POST['token_reporte'] ?? '')));
+$id_historial = obtenerIdAnalisisPorToken($conn, $token_reporte);
+
+function volverInformeComentario(string $token_reporte, string $estado): void
+{
+    if (tokenReporteValido($token_reporte)) {
+        header("Location: ver_resultado.php?r=" . urlencode($token_reporte) . "&comentario=" . urlencode($estado));
+    } else {
+        header("Location: ../index.php");
+    }
+    exit;
+}
+
+if (!validarCsrf()) {
+    volverInformeComentario($token_reporte, 'error');
+}
+
+if ($id_historial <= 0 || !usuarioPuedeAccederAnalisis($conn, $id_historial) || !analisisEstaCompleto($conn, $id_historial)) {
+    header("Location: ../index.php");
+    exit;
+}
+
+$token_reporte = asegurarTokenAnalisis($conn, $id_historial);
+
 // Recoger y limpiar variables
 $id_usuario      = (int)$_SESSION['id_usuario'];
 $autor_nombre    = trim($_SESSION['usuario'] ?? 'Usuario');
-$dominio_entrada = $_POST['dominio'] ?? '';
 $comentario      = trim($_POST['comentario'] ?? '');
 $tipo_comentario = trim($_POST['tipo_comentario'] ?? 'otro');
-$id_historial    = isset($_POST['id_historial']) ? (int)$_POST['id_historial'] : 0;
 
-// Normalización correcta (Cambiando el delimitador # por ~)
-$dominio = trim($dominio_entrada);
+$stmt_dominio = mysqli_prepare($conn, "SELECT dominio FROM historial_dominios WHERE id = ? LIMIT 1");
+mysqli_stmt_bind_param($stmt_dominio, "i", $id_historial);
+mysqli_stmt_execute($stmt_dominio);
+$fila_dominio = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt_dominio));
+mysqli_stmt_close($stmt_dominio);
+
+if (!$fila_dominio) {
+    header("Location: ../index.php");
+    exit;
+}
+
+// El dominio se toma de la BD para evitar manipulación del campo oculto.
+$dominio = trim($fila_dominio['dominio']);
 $dominio = preg_replace('~^https?://~i', '', $dominio); 
 $dominio = preg_replace('~^www\.~i', '', $dominio);     
 $dominio = preg_replace('~[/?#].*$~', '', $dominio);    
@@ -33,12 +67,8 @@ $dominio = rtrim($dominio, '.');
 $tipos_validos = ['phishing', 'malware', 'spam', 'suplantacion', 'fraude', 'otro'];
 
 // Comprobaciones de seguridad
-if (empty($dominio) || $comentario === '' || !in_array($tipo_comentario, $tipos_validos, true)) {
-    if ($id_historial > 0) {
-        header("Location: ver_resultado.php?id=" . $id_historial . "&comentario=error");
-    } else {
-        header("Location: ../index.php");
-    }
+if (empty($dominio) || !filter_var($dominio, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME) || $comentario === '' || !in_array($tipo_comentario, $tipos_validos, true)) {
+    volverInformeComentario($token_reporte, 'error');
     exit;
 }
 
@@ -56,15 +86,15 @@ if ($stmt = mysqli_prepare($conn, $sql)) {
     
     if (mysqli_stmt_execute($stmt)) {
         // Éxito: redireccionamos con ok
-        header("Location: ver_resultado.php?id=" . $id_historial . "&comentario=ok");
+        volverInformeComentario($token_reporte, 'ok');
     } else {
         // Falla la ejecución de la consulta
-        header("Location: ver_resultado.php?id=" . $id_historial . "&comentario=error");
+        volverInformeComentario($token_reporte, 'error');
     }
     mysqli_stmt_close($stmt);
 } else {
     // Falla la preparación de la consulta
-    header("Location: ver_resultado.php?id=" . $id_historial . "&comentario=error");
+    volverInformeComentario($token_reporte, 'error');
 }
 exit;
 ?>

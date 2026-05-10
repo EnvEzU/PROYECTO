@@ -1,14 +1,26 @@
 <?php
 session_start();
 require_once '../config/conexion.php';
+require_once '../includes/seguridad.php';
 
 set_time_limit(60);
+
+// Permite diferenciar entre dominio sospechoso y análisis no concluyente.
+if (function_exists('pavonSqlSeguro')) {
+    pavonSqlSeguro($conn, "ALTER TABLE historial_dominios MODIFY estado ENUM('segura','maliciosa','sospechosa','no_concluyente') DEFAULT 'no_concluyente'");
+}
 
 if (!isset($_POST['id_historial'])) {
     die("Error: No se recibió el ID por POST.");
 }
 
 $id_historial = (int)$_POST['id_historial'];
+
+if (!usuarioPuedeAccederAnalisis($conn, $id_historial)) {
+    die("Error: Acceso no autorizado.");
+}
+
+registrarAnalisisPermitido($id_historial);
 
 function h(string $texto): string
 {
@@ -65,7 +77,7 @@ require_once '../includes/header.php';
 <div class="container mt-5 mb-5">
     <div class="card shadow-lg border-0 mx-auto border-primary border-top border-5">
         <div class="card-body p-5">
-            <h4 class="text-muted mb-3">Paso 1 de 6</h4>
+            <h4 class="text-muted mb-3">Paso 1 de 7</h4>
             <h2 class="text-primary mb-4"><i class="bi bi-shield-shaded"></i> Threat Intelligence (VirusTotal)</h2>
             <p class="lead">Consultando reputación global para: <strong><?= h($dominio) ?></strong></p>
 
@@ -111,7 +123,7 @@ require_once '../includes/header.php';
                         "error" => "Error de conexión con la API",
                         "detalle" => $curl_error
                     ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-                    $estado = 'sospechosa';
+                    $estado = 'no_concluyente';
                 } elseif ($http_code === 200) {
                     echo "[INFO] Respuesta recibida correctamente. Procesando reputación del dominio...<br>";
                     flush();
@@ -155,7 +167,7 @@ require_once '../includes/header.php';
                         }
                     } else {
                         echo "<span style='color:#ffc107;'>[INFO] No se encontraron estadísticas completas en la respuesta.</span><br>";
-                        $estado = 'sospechosa';
+                        $estado = 'no_concluyente';
                     }
                 } else {
                     echo "<span style='color:#ff8080;'>[ERROR] La API respondió con código HTTP " . (int)$http_code . ".</span><br>";
@@ -164,7 +176,7 @@ require_once '../includes/header.php';
                         "code" => $http_code,
                         "domain" => $dominio
                     ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-                    $estado = 'sospechosa';
+                    $estado = 'no_concluyente';
                 }
 
                 // Borramos resultado anterior de VirusTotal si existe

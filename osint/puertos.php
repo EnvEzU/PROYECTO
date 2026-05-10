@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once '../config/conexion.php';
+require_once '../includes/seguridad.php';
 
 set_time_limit(90);
 
@@ -9,6 +10,12 @@ if (!isset($_POST['id_historial'])) {
 }
 
 $id = (int)$_POST['id_historial'];
+
+if (!usuarioPuedeAccederAnalisis($conn, $id)) {
+    die("Error: Acceso no autorizado.");
+}
+
+registrarAnalisisPermitido($id);
 
 function h(string $texto): string
 {
@@ -127,7 +134,7 @@ require_once '../includes/header.php';
 <div class="container mt-5 mb-5">
     <div class="card shadow-lg border-0 mx-auto border-danger border-top border-5">
         <div class="card-body p-5">
-            <h4 class="text-muted mb-3">Paso 6 de 6</h4>
+            <h4 class="text-muted mb-3">Paso 7 de 7</h4>
             <h2 class="text-danger mb-4"><i class="bi bi-door-open"></i> Escáner de Puertos TCP</h2>
             <p class="lead">Auditando servicios expuestos para: <strong><?= h($dominioNormalizado) ?></strong></p>
 
@@ -273,17 +280,29 @@ require_once '../includes/header.php';
                     }
                 }
 
+                $resultadoPuertosGuardado = false;
+
                 $stmtDelete = mysqli_prepare($conn, "DELETE FROM osint_resultados WHERE id_historial = ? AND herramienta = 'Puertos'");
-                mysqli_stmt_bind_param($stmtDelete, "i", $id);
-                mysqli_stmt_execute($stmtDelete);
-                mysqli_stmt_close($stmtDelete);
+                if ($stmtDelete) {
+                    mysqli_stmt_bind_param($stmtDelete, "i", $id);
+                    mysqli_stmt_execute($stmtDelete);
+                    mysqli_stmt_close($stmtDelete);
+                }
 
                 $stmtInsert = mysqli_prepare($conn, "INSERT INTO osint_resultados (id_historial, herramienta, resultado_completo) VALUES (?, 'Puertos', ?)");
-                mysqli_stmt_bind_param($stmtInsert, "is", $id, $informeFinal);
-                mysqli_stmt_execute($stmtInsert);
-                mysqli_stmt_close($stmtInsert);
+                if ($stmtInsert) {
+                    mysqli_stmt_bind_param($stmtInsert, "is", $id, $informeFinal);
+                    $resultadoPuertosGuardado = mysqli_stmt_execute($stmtInsert);
+                    mysqli_stmt_close($stmtInsert);
+                }
 
-                echo "<br><span style='color:#ffffff;'>[OK] Escaneo finalizado. Guardando resultados y generando informe...</span>";
+                if ($resultadoPuertosGuardado) {
+                    marcarAnalisisCompleto($conn, $id);
+                    echo "<br><span style='color:#ffffff;'>[OK] Escaneo finalizado. Guardando resultados y generando informe...</span>";
+                } else {
+                    echo "<br><span style='color:#ff6b6b;'>[ERROR] No se pudo guardar el resultado final. Este análisis no se añadirá al historial.</span>";
+                    exit;
+                }
                 ?>
             </div>
 

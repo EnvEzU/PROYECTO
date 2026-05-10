@@ -1,9 +1,17 @@
 <?php
 session_start();
 require_once '../config/conexion.php';
+require_once '../includes/seguridad.php';
 
 $error = "";
 $id_analisis = null;
+
+// Estado adicional para evitar falsos positivos cuando una API no devuelve datos.
+if (function_exists('pavonSqlSeguro')) {
+    pavonSqlSeguro($conn, "ALTER TABLE historial_dominios MODIFY estado ENUM('segura','maliciosa','sospechosa','no_concluyente') DEFAULT 'no_concluyente'");
+}
+asegurarColumnaAnalisisCompleto($conn);
+limpiarAnalisisIncompletosAntiguos($conn, 60);
 
 /**
  * Limpia y normaliza un dominio.
@@ -54,22 +62,25 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     if ($dominio === false) {
         $error = "Introduce un dominio válido. Ejemplo: google.com";
     } else {
+        $token_publico = generarTokenPublicoAnalisis();
+
         if (isset($_SESSION['id_usuario'])) {
             $id_usuario = (int)$_SESSION['id_usuario'];
 
-            $sql = "INSERT INTO historial_dominios (id_usuario, dominio, estado, detalles) 
-                    VALUES (?, ?, 'sospechosa', 'Análisis manual')";
+            $sql = "INSERT INTO historial_dominios (id_usuario, dominio, estado, detalles, token_publico, analisis_completo) 
+                    VALUES (?, ?, 'no_concluyente', 'Análisis manual', ?, 0)";
             $stmt = mysqli_prepare($conn, $sql);
-            mysqli_stmt_bind_param($stmt, "is", $id_usuario, $dominio);
+            mysqli_stmt_bind_param($stmt, "iss", $id_usuario, $dominio, $token_publico);
         } else {
-            $sql = "INSERT INTO historial_dominios (id_usuario, dominio, estado, detalles) 
-                    VALUES (NULL, ?, 'sospechosa', 'Análisis anónimo')";
+            $sql = "INSERT INTO historial_dominios (id_usuario, dominio, estado, detalles, token_publico, analisis_completo) 
+                    VALUES (NULL, ?, 'no_concluyente', 'Análisis anónimo', ?, 0)";
             $stmt = mysqli_prepare($conn, $sql);
-            mysqli_stmt_bind_param($stmt, "s", $dominio);
+            mysqli_stmt_bind_param($stmt, "ss", $dominio, $token_publico);
         }
 
         if ($stmt && mysqli_stmt_execute($stmt)) {
             $id_analisis = mysqli_insert_id($conn);
+            registrarAnalisisPermitido((int)$id_analisis);
             mysqli_stmt_close($stmt);
             ?>
             <!DOCTYPE html>
@@ -140,7 +151,7 @@ require_once '../includes/header.php';
                             >
                         </div>
                         <div class="form-text">
-                            Puedes introducir un dominio normal o una URL. Se guardará solo el dominio.
+                            Puedes introducir un dominio normal o una URL. El informe solo se guardará si el análisis termina completo.
                         </div>
                     </div>
 

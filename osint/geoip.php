@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once '../config/conexion.php';
+require_once '../includes/seguridad.php';
 
 set_time_limit(60);
 
@@ -9,6 +10,12 @@ if (!isset($_POST['id_historial'])) {
 }
 
 $id = (int)$_POST['id_historial'];
+
+if (!usuarioPuedeAccederAnalisis($conn, $id)) {
+    die("Error: Acceso no autorizado.");
+}
+
+registrarAnalisisPermitido($id);
 
 function h(string $texto): string
 {
@@ -63,7 +70,7 @@ require_once '../includes/header.php';
 <div class="container mt-5 mb-5">
     <div class="card shadow-lg border-0 mx-auto border-success border-top border-5">
         <div class="card-body p-5">
-            <h4 class="text-muted mb-3">Paso 5 de 6</h4>
+            <h4 class="text-muted mb-3">Paso 5 de 7</h4>
             <h2 class="text-success mb-4"><i class="bi bi-geo-alt"></i> Geolocalización ASN & BGP</h2>
             <p class="lead">Localizando infraestructura física para: <strong><?= h($dominio) ?></strong></p>
 
@@ -162,7 +169,7 @@ require_once '../includes/header.php';
     </div>
 </div>
 
-<form id="nextStep" action="puertos.php" method="POST">
+<form id="nextStep" action="certificado_ssl.php" method="POST">
     <input type="hidden" name="id_historial" value="<?= (int)$id ?>">
 </form>
 

@@ -21,6 +21,9 @@ SET time_zone = "+00:00";
 -- Base de datos: `virustotal_osint`
 --
 
+CREATE DATABASE IF NOT EXISTS `virustotal_osint` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE `virustotal_osint`;
+
 -- --------------------------------------------------------
 
 --
@@ -81,9 +84,11 @@ CREATE TABLE `historial_dominios` (
   `id` int(11) NOT NULL,
   `id_usuario` int(11) DEFAULT NULL,
   `dominio` varchar(255) NOT NULL,
-  `estado` enum('segura','maliciosa','sospechosa') DEFAULT 'sospechosa',
+  `estado` enum('segura','maliciosa','sospechosa','no_concluyente') DEFAULT 'no_concluyente',
   `detalles` text DEFAULT NULL,
-  `fecha_escaneo` timestamp NOT NULL DEFAULT current_timestamp()
+  `fecha_escaneo` timestamp NOT NULL DEFAULT current_timestamp(),
+  `token_publico` varchar(64) DEFAULT NULL,
+  `analisis_completo` tinyint(1) NOT NULL DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
@@ -109,7 +114,7 @@ INSERT INTO `historial_dominios` (`id`, `id_usuario`, `dominio`, `estado`, `deta
 (16, 1, 'google.com', 'segura', 'Análisis manual', '2026-04-22 08:45:16'),
 (17, 1, 'google.com', 'segura', 'Análisis manual', '2026-04-22 08:49:24'),
 (18, 1, 'web-peligrosa.net', 'segura', 'Análisis manual', '2026-04-22 08:51:52'),
-(19, 1, 'lusive.xyz', 'sospechosa', 'Análisis manual', '2026-04-22 08:53:32'),
+(19, 1, 'lusive.xyz', 'no_concluyente', 'Análisis manual', '2026-04-22 08:53:32'),
 (20, 1, 'google.com', 'segura', 'Análisis manual', '2026-04-22 09:03:40'),
 (21, 1, 'virustotal.com', 'segura', 'Análisis manual', '2026-04-22 09:05:33'),
 (22, 1, 'youtube.com', 'segura', 'Análisis manual', '2026-05-08 05:20:28'),
@@ -119,6 +124,9 @@ INSERT INTO `historial_dominios` (`id`, `id_usuario`, `dominio`, `estado`, `deta
 (26, NULL, 'wicar.org', 'maliciosa', 'Análisis anónimo', '2026-05-09 09:17:15'),
 (27, 3, 'wicar.org', 'maliciosa', 'Análisis manual', '2026-05-09 09:18:43'),
 (28, 2, 'wicar.org', 'maliciosa', 'Análisis manual', '2026-05-09 09:27:58');
+
+-- Marcar como completos los análisis de ejemplo importados con el volcado.
+UPDATE `historial_dominios` SET `analisis_completo` = 1;
 
 -- --------------------------------------------------------
 
@@ -370,7 +378,9 @@ ALTER TABLE `historial_dominios`
   ADD KEY `fk_historial_usuario` (`id_usuario`),
   ADD KEY `idx_historial_dominio` (`dominio`),
   ADD KEY `idx_historial_estado` (`estado`),
-  ADD KEY `idx_historial_fecha` (`fecha_escaneo`);
+  ADD KEY `idx_historial_fecha` (`fecha_escaneo`),
+  ADD KEY `idx_historial_completo` (`analisis_completo`),
+  ADD UNIQUE KEY `idx_historial_token_publico` (`token_publico`);
 
 --
 -- Indices de la tabla `osint_resultados`
